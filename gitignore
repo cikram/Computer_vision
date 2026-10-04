@@ -1,0 +1,29 @@
+@"
+# ---------- virtual environments  ----------
+/cv/
+.venv/
+venv/
+env/
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---------- secrets and local config ----------
+.env
+.env.*
+.streamlit/secrets.toml
+
+# ---------- editors and OS ----------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+~`$*
+
+"@ | Out-File -Encoding ascii .gitignore

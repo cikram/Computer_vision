@@ -1,0 +1,13 @@
+# virtual environments (never push these)
+cv/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+
+# editors and OS
+.idea/
+.vscode/
+.DS_Store
