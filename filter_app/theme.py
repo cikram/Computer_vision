@@ -2,6 +2,8 @@
 
 Pure CSS injected with st.markdown. No images, no JavaScript.
 """
+import html
+
 import streamlit as st
 
 LIGHT = {
@@ -87,7 +89,7 @@ html, body, .stApp, .stApp *:not([data-testid="stIconMaterial"]):not([class*="ma
   border-radius: 12px !important; color: var(--text) !important;
 }
 [data-testid="stSelectbox"] input, [data-testid="stMultiSelect"] input, [data-baseweb="select"] * { color: var(--text) !important; }
-[data-testid="stSelectbox"] svg, [data-testid="stMultiSelect"] svg { color: var(--muted); fill: currentColor; }
+[data-testid="stSelectbox"] [role="group"] svg, [data-testid="stMultiSelect"] [role="group"] svg { color: var(--muted); fill: currentColor; }
 [data-testid$="VirtualDropdown"], [role="listbox"], [data-baseweb="popover"] > div, [data-baseweb="menu"] {
   background: var(--field) !important; color: var(--text) !important;
   border: 1px solid var(--border); border-radius: 12px;
@@ -104,6 +106,7 @@ html, body, .stApp, .stApp *:not([data-testid="stIconMaterial"]):not([class*="ma
 [data-testid="stSliderThumbValue"] p, [data-testid="stSlider"] [data-testid="stThumbValue"] { color: var(--accent) !important; font-weight: 600; }
 
 [data-testid="stRadio"] label, [data-testid="stCheckbox"] label, [data-testid="stToggle"] label { color: var(--text); }
+[data-testid="stToggle"] label, [data-testid="stToggle"] label *, [data-testid="stCheckbox"] label { background-color: transparent; }
 [data-testid="stRadio"] [role="radiogroup"] { gap: .15rem; }
 
 /* unselected radio and checkbox: follow the theme instead of staying white */
@@ -118,6 +121,53 @@ html, body, .stApp, .stApp *:not([data-testid="stIconMaterial"]):not([class*="ma
 .stButton > button *, .stDownloadButton > button *, [data-testid="stFileUploaderDropzone"] button * { color: var(--btn-ink) !important; }
 .stButton > button:hover, .stDownloadButton > button:hover, [data-testid="stFileUploaderDropzone"] button:hover { background: var(--btn-hover); color: var(--btn-ink); }
 .stDownloadButton > button { width: 100%; }
+
+/* segmented controls (Mode, View) and pills (filters) */
+button[data-variant="segmented_control"], button[data-variant="pills"] {
+  background: var(--field) !important; color: var(--text) !important; border: 1px solid var(--border) !important;
+  font-size: .8rem; box-shadow: none !important;
+}
+button[data-variant="segmented_control"] *, button[data-variant="pills"] * { color: inherit !important; background: transparent !important; }
+button[data-variant="segmented_control"][data-selected="true"], button[data-variant="pills"][data-selected="true"] {
+  background: var(--accent) !important; color: var(--accent-ink) !important; border-color: var(--accent) !important;
+}
+button[data-variant="segmented_control"] { padding: .3rem .3rem !important; flex: 1 1 0; min-width: 0; white-space: nowrap; font-size: .76rem; }
+button[data-variant="pills"] { border-radius: 999px !important; font-size: .78rem; }
+button[data-variant="segmented_control"]:hover, button[data-variant="pills"]:hover { border-color: var(--accent) !important; }
+
+/* quiet buttons in the sidebar: filter groups and reset */
+.stApp [class*="st-key-reset_"] button, .stApp [class*="st-key-grp_"] button {
+  background: transparent; color: var(--muted); border: 1px solid var(--border);
+  padding: .18rem .3rem; font-size: .74rem; min-height: 0; width: 100%; white-space: nowrap;
+}
+.stApp [class*="st-key-reset_"] button *, .stApp [class*="st-key-grp_"] button * { color: var(--muted) !important; }
+.stApp [class*="st-key-reset_"] button:hover, .stApp [class*="st-key-grp_"] button:hover { background: var(--border); }
+.stApp [class*="st-key-reset_"] button:hover *, .stApp [class*="st-key-grp_"] button:hover * { color: var(--text) !important; }
+
+/* card header: the filter name on the left, reset and download as round icon buttons on the right */
+[class*="st-key-head_"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap; gap: .4rem; align-items: center; }
+[class*="st-key-head_"] [data-testid="stColumn"] { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; }
+[class*="st-key-head_"] [data-testid="stColumn"]:first-child { flex: 1 1 auto !important; }
+.stApp [class*="st-key-rs_"] button, .stApp [class*="st-key-dl_"] button {
+  width: 34px; height: 34px; min-height: 0; padding: 0; border-radius: 999px;
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.stApp [class*="st-key-rs_"] button *, .stApp [class*="st-key-dl_"] button * { color: var(--muted) !important; font-size: 1.1rem; }
+.stApp [class*="st-key-rs_"] button:hover, .stApp [class*="st-key-dl_"] button:hover { background: var(--border); border-color: var(--line); }
+.stApp [class*="st-key-rs_"] button:hover *, .stApp [class*="st-key-dl_"] button:hover * { color: var(--text) !important; }
+
+/* the fullscreen button Streamlit adds on hover: inside the image corner, dark glass, readable on any theme */
+[data-testid="stElementToolbar"] { top: 6px !important; right: 6px !important; }
+[data-testid="stElementToolbarButtonContainer"] {
+  background: rgba(15, 15, 16, .62) !important; border: 1px solid rgba(255, 255, 255, .22) !important;
+  border-radius: 9px !important; box-shadow: none !important; backdrop-filter: blur(6px);
+}
+[data-testid="stElementToolbar"] button, [data-testid="stElementToolbar"] button * { color: #fff !important; background: transparent !important; }
+
+/* tooltips */
+[data-testid="stTooltipContent"] { background: var(--btn) !important; color: var(--btn-ink) !important; border-radius: 10px; }
+[data-testid="stTooltipContent"] * { color: var(--btn-ink) !important; }
+[data-testid="stTooltipIcon"], [data-testid="stTooltipIcon"] svg { color: var(--text) !important; opacity: .6 !important; }
 
 /* ---------- uploader ---------- */
 [data-testid="stFileUploader"] section, [data-testid="stFileUploaderDropzone"] {
@@ -140,6 +190,13 @@ html, body, .stApp, .stApp *:not([data-testid="stIconMaterial"]):not([class*="ma
 
 /* live camera panel (a separate iframe that keeps its own light look) */
 iframe[title*="webrtc" i] { border-radius: 18px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow); }
+.st-key-camera_box { container-type: inline-size; margin: 0 auto; }
+
+/* expanders (one per camera filter) */
+[data-testid="stExpander"] details { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+[data-testid="stExpander"] summary { background: var(--field) !important; }
+[data-testid="stExpander"] summary, [data-testid="stExpander"] summary * { color: var(--text) !important; font-size: .85rem; font-weight: 600; }
+[data-testid="stExpander"] summary:hover { filter: brightness(.96); }
 [data-testid="stImage"] img { border-radius: 14px; }
 [data-testid="stImage"] [data-testid="stImageCaption"] { color: var(--muted); font-size: .72rem; }
 
@@ -181,6 +238,9 @@ iframe[title*="webrtc" i] { border-radius: 18px; border: 1px solid var(--border)
 .pic.edge { background: #111; }
 .pic.edge::before { content: ""; position: absolute; width: 22px; height: 22px; border: 2px solid #f2f2f2; border-radius: 50%; right: 18%; top: 14%; }
 .pic.edge::after { content: ""; position: absolute; left: -10%; right: -10%; bottom: -35%; height: 72%; border-top: 2px solid #f2f2f2; border-radius: 50%; }
+.pic.ph { background-size: cover; background-position: center; background-repeat: no-repeat; }
+.lane.l .pc:nth-child(3n+2) .pic.ph { background-position: 18% 40%; }
+.lane.l .pc:nth-child(3n) .pic.ph { background-position: 85% 60%; }
 .pcl { font-size: 10.5px; line-height: 1; color: var(--text); font-weight: 600; display: flex; justify-content: space-between; opacity: .85; }
 .pcl span:last-child { color: var(--muted); font-weight: 500; }
 
@@ -192,6 +252,23 @@ iframe[title*="webrtc" i] { border-radius: 18px; border: 1px solid var(--border)
 .pipe { position: absolute; left: 50%; width: 1px; height: 26px; background: var(--line); z-index: 2; }
 .pipe.t { top: -10px; } .pipe.b { bottom: -10px; }
 
+/* compact header: shown once a photo is loaded or the camera is on */
+.hero.compact { padding: .9rem 0 0; }
+.hero.compact h1 { font-size: clamp(1.2rem, 2.3vw, 1.6rem); }
+.hero.compact p { display: none; }
+.hero.compact .belt { height: 108px; margin: 1.05rem 0 .8rem; }
+.hero.compact .band { top: 9px; bottom: 9px; }
+.hero.compact .bars { inset: 11px 0; }
+.hero.compact .track { gap: 22px; padding-right: 22px; }
+.hero.compact .pc { width: 104px; height: 78px; padding: 5px; gap: 4px; border-radius: 12px; }
+.hero.compact .pic { border-radius: 7px; }
+.hero.compact .pcl { font-size: 9px; }
+.hero.compact .pcl span:last-child { display: none; }
+.hero.compact .chip { width: 86px; height: 86px; border-radius: 16px; gap: .3rem; box-shadow: var(--shadow), 0 0 0 5px var(--glass); }
+.hero.compact .chip .logo { width: 14px; height: 14px; gap: 2px; }
+.hero.compact .chip b { font-size: .68rem; }
+.hero.compact .pipe { height: 14px; } .hero.compact .pipe.t { top: -5px; } .hero.compact .pipe.b { bottom: -5px; }
+
 @keyframes slide { from { transform: translateX(-50%); } to { transform: translateX(0); } }
 @keyframes bars { from { background-position: 0 0; } to { background-position: 21px 0; } }
 
@@ -199,6 +276,7 @@ iframe[title*="webrtc" i] { border-radius: 18px; border: 1px solid var(--border)
   .belt { height: 150px; } .pc { width: 104px; height: 80px; padding: 6px; } .pcl { font-size: 9px; }
   .chip { width: 104px; height: 104px; border-radius: 16px; } .chip b { font-size: .85rem; } .chip .logo { width: 16px; height: 16px; }
   .track { gap: 22px; }
+  .hero.compact .belt { height: 92px; } .hero.compact .pc { width: 84px; height: 64px; } .hero.compact .chip { width: 70px; height: 70px; } .hero.compact .chip b { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .track, .bars { animation: none; } }
 """
@@ -216,22 +294,30 @@ def _card(kind, left, right):
     )
 
 
-def _hero_html():
-    raw = [("noisy", "photo.jpg", "800 px")] * 6
-    done = [
-        ("blur", "Gaussian", "σ 3"),
-        ("edge", "Canny", "100/200"),
-        ("gray", "Grayscale", "BGR2GRAY"),
-        ("blur", "Median", "ksize 5"),
-        ("edge", "Sobel", "ksize 3"),
-        ("gray", "HSV", "Value"),
-    ]
+def _hero_html(compact, photo):
+    """photo: None, or {"css", "label", "size", "filtered": [(css class, name, detail), ...]}."""
+    if photo:  # the visitor's own picture rides the belt: raw on the left, filtered on the right
+        raw = [("ph th0", html.escape(photo["label"]), photo["size"])] * 6
+        done = [(f"ph {cls}", html.escape(name), html.escape(detail)) for cls, name, detail in photo["filtered"]]
+        extra_css = f"<style>{photo['css']}</style>"
+    else:
+        raw = [("noisy", "photo.jpg", "800 px")] * 6
+        done = [
+            ("blur", "Gaussian", "σ 3"),
+            ("edge", "Canny", "100/200"),
+            ("gray", "Grayscale", "BGR2GRAY"),
+            ("blur", "Median", "ksize 5"),
+            ("edge", "Sobel", "ksize 3"),
+            ("gray", "HSV", "Value"),
+        ]
+        extra_css = ""
     # each track holds its cards twice so the loop is seamless
     left = "".join(_card(*c) for c in raw * 2)
     right = "".join(_card(*c) for c in done * 2)
-    return _compact(
+    size = " compact" if compact else ""
+    return extra_css + _compact(
         f"""
-        <div class="hero">
+        <div class="hero{size}">
           <h1><span class="hl">Image filters</span> in real time</h1>
           <p>Upload a photo or use your camera, then tune every OpenCV filter with a slider.</p>
           <div class="belt">
@@ -246,13 +332,15 @@ def _hero_html():
     )
 
 
-def inject(dark):
+def inject(dark, hide_uploader=False):
     """Write the theme CSS for the current mode."""
     palette = dict(DARK if dark else LIGHT)
     palette["scheme"] = "dark" if dark else "light"
     css = CSS
     for key, value in palette.items():
         css = css.replace(f"__{key}__", value)
+    if hide_uploader:  # keep the widget alive (so the photo is remembered) but not visible
+        css += ".st-key-uploader_box { display: none; }"
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
@@ -263,5 +351,19 @@ def brand():
     )
 
 
-def hero():
-    st.markdown(_hero_html(), unsafe_allow_html=True)
+def hero(compact=False, photo=None):
+    st.markdown(_hero_html(compact, photo), unsafe_allow_html=True)
+
+
+def fit_camera(ratio):
+    """Size the camera panel to the video, so no empty band is left under it.
+
+    ratio is width / height of the live picture. The picture is built with that exact ratio,
+    so the height follows from the width: width / ratio, plus the START/STOP bar (about 58 px).
+    """
+    max_width = min(1180, round(540 * ratio))  # keep tall layouts from getting huge
+    st.markdown(
+        f"<style>.st-key-camera_box {{ max-width: {max_width}px; }}"
+        f".st-key-camera_box iframe {{ height: calc(100cqw / {ratio:.4f} + 58px) !important; }}</style>",
+        unsafe_allow_html=True,
+    )

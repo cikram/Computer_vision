@@ -3,6 +3,8 @@
 Run with:  streamlit run app.py
 Files:     app.py (interface)  |  filters.py (OpenCV logic)  |  theme.py (look)
 """
+import base64
+
 import cv2
 import numpy as np
 import streamlit as st
@@ -12,6 +14,7 @@ import theme
 
 MAX_WIDTH = 800  # uploaded photos are shrunk to this width so the grid stays fast
 VIEWS = ["Side by side", "Filtered only", "Original only"]
+CAM_DEFAULTS = ["Gaussian", "Canny", "Sobel"]  # what Filter A, B and C start with in camera mode
 
 st.set_page_config(page_title="Filter Studio", layout="wide", initial_sidebar_state="auto")
 
@@ -35,7 +38,7 @@ if CAMERA_READY:
         """Runs on every frame. The sliders update self.cfg, so changes show instantly."""
 
         def __init__(self):
-            self.cfg = ("Original (BGR)", None, "None", {}, "Filtered only")
+            self.cfg = ("Original (BGR)", None, [("None", {})], "Compare")
 
         def update(self, cfg):
             self.cfg = cfg  # one assignment, safe across threads
@@ -55,27 +58,61 @@ if CAMERA_READY:
 def render_params(spec, prefix, box):
     """Draw the widgets of one filter inside `box` and return {param: value}."""
     values = {}
-    for key, label, kind, opts, default, show_if in spec:
-        if show_if is not None and not show_if(values):
+    for p in spec:
+        if p.show_if is not None and not p.show_if(values):
             continue
-        wkey = f"{prefix}_{key}"  # unique per filter, so cards never share values
-        if kind == "odd":  # odd sizes only: odd minimum + step 2
-            values[key] = box.slider(label, opts[0], opts[1], default, step=2, key=wkey)
-        elif kind == "int":
-            values[key] = box.slider(label, opts[0], opts[1], default, key=wkey)
-        elif kind == "float":
-            values[key] = box.slider(label, opts[0], opts[1], default, step=opts[2], key=wkey)
-        elif kind == "bool":
-            values[key] = box.checkbox(label, value=default, key=wkey)
-        elif all(isinstance(o, int) for o in opts):
-            values[key] = box.select_slider(label, options=opts, value=default, key=wkey)
-        elif len(opts) <= 3:
-            values[key] = box.radio(
-                label, opts, index=opts.index(default), horizontal=True, key=wkey
-            )
+        wkey = f"{prefix}_{p.key}"  # unique per filter, so cards never share values
+        if p.kind == "odd":  # odd sizes only: odd minimum + step 2
+            values[p.key] = box.slider(p.label, p.options[0], p.options[1], p.default,
+                                       step=2, key=wkey, help=p.help)
+        elif p.kind == "int":
+            values[p.key] = box.slider(p.label, p.options[0], p.options[1], p.default,
+                                       key=wkey, help=p.help)
+        elif p.kind == "float":
+            values[p.key] = box.slider(p.label, p.options[0], p.options[1], p.default,
+                                       step=p.options[2], key=wkey, help=p.help)
+        elif p.kind == "bool":
+            values[p.key] = box.checkbox(p.label, value=p.default, key=wkey, help=p.help)
+        elif all(isinstance(o, int) for o in p.options):
+            values[p.key] = box.select_slider(p.label, options=p.options, value=p.default,
+                                              key=wkey, help=p.help)
+        elif len(p.options) <= 3:
+            values[p.key] = box.radio(p.label, p.options, index=p.options.index(p.default),
+                                      horizontal=True, key=wkey, help=p.help)
         else:
-            values[key] = box.selectbox(label, opts, index=opts.index(default), key=wkey)
+            values[p.key] = box.selectbox(p.label, p.options, index=p.options.index(p.default),
+                                          key=wkey, help=p.help)
     return values
+
+
+def reset_params(prefix, name):
+    """Put the sliders of one filter back to their defaults (runs as a button callback)."""
+    for p in F.FILTERS.get(name, []):
+        key = f"{prefix}_{p.key}"
+        if key in st.session_state:
+            st.session_state[key] = p.default
+
+
+def reset_all():
+    for name in F.FILTER_NAMES:
+        reset_params(name, name)
+
+
+def pick_group(group):
+    st.session_state["selected"] = list(F.GROUPS[group])
+
+
+def keep_one(key, fallback):
+    """Segmented controls and pills can be un-clicked. Put the last real choice back instead."""
+    value = st.session_state.get(key)
+    if value:
+        st.session_state[f"{key}__last"] = value
+    else:
+        st.session_state[key] = st.session_state.get(f"{key}__last", fallback)
+
+
+def show(img, **kwargs):
+    st.image(F.to_display(img), width="stretch", **kwargs)
 
 
 @st.cache_data(show_spinner=False)
@@ -85,42 +122,76 @@ def load_image(data):
     return None if img is None else F.resize_max(img, MAX_WIDTH)
 
 
+def _data_uri(x):
+    ok, buf = cv2.imencode(".jpg", x, [cv2.IMWRITE_JPEG_QUALITY, 70])
+    return "data:image/jpeg;base64," + base64.b64encode(buf).decode()
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def hero_photo(data, name):
+    """Small copies of the upload for the header belt: the raw photo, then six filtered versions."""
+    img = load_image(data)
+    if img is None:
+        return None
+    small = F.resize_max(img, 260)
+    steps = [  # card title, detail, result
+        ("Gaussian", "ksize 11", F.apply_filter(small, "Gaussian", {"ksize": 11})),
+        ("Canny", "100 / 200", F.apply_filter(small, "Canny", {})),
+        ("Grayscale", "BGR2GRAY", F.convert_space(small, "Grayscale")),
+        ("Median", "ksize 7", F.apply_filter(small, "Median", {"ksize": 7})),
+        ("Sobel", "ksize 3", F.apply_filter(small, "Sobel", {"pre": True})),
+        ("Laplacian", "ksize 3", F.apply_filter(small, "Laplacian", {"pre": True})),
+    ]
+    images = [small] + [result for _, _, result in steps]
+    css = "".join(f".pic.th{i}{{background-image:url({_data_uri(im)})}}" for i, im in enumerate(images))
+    shown = name if len(name) <= 13 else name[:12] + "…"
+    return {
+        "css": css,
+        "label": shown,
+        "size": f"{img.shape[1]}×{img.shape[0]}",
+        "filtered": [(f"th{i + 1}", t, d) for i, (t, d, _) in enumerate(steps)],
+    }
+
+
 # --------------------------------------------------------------------------------------
 # Photo mode
 # --------------------------------------------------------------------------------------
 @fragment
 def filter_card(name, src, view):
-    """One filter: title, image(s), its own sliders, download button."""
+    """One filter: title with reset and download icons, image(s), and its own sliders."""
     with st.container(key=f"card_{name}"):
-        st.markdown(f'<span class="tag">{name}</span>', unsafe_allow_html=True)
-        image_slot = st.container()  # filled after the sliders are read
+        head = st.container(key=f"head_{name}")  # filled below, once the result exists
+        image_slot = st.container()
         params = render_params(F.FILTERS[name], name, st)
+        out, error = None, None
         try:
             out = F.apply_filter(src, name, params)
         except Exception as err:
-            st.error(f"{name} failed with these settings: {err}")
+            error = err
+        with head:
+            title, reset_col, save_col = st.columns(3, vertical_alignment="center")
+            title.markdown(f'<span class="tag">{name}</span>', unsafe_allow_html=True)
+            reset_col.button(":material/restart_alt:", key=f"rs_{name}", help="Reset this filter",
+                             on_click=reset_params, args=(name, name))
+            if out is not None:
+                save_col.download_button(":material/download:", data=F.encode_png(out),
+                                         file_name=f"{name.lower()}.png", mime="image/png",
+                                         key=f"dl_{name}", help="Download PNG", on_click="ignore")
+        if error is not None:
+            st.error(f"{name} failed with these settings: {error}")
             return
         with image_slot:
             if view == "Side by side":
                 left, right = st.columns(2)
-                left.image(F.to_display(src), caption="Source", width="stretch")
-                right.image(F.to_display(out), caption="Filtered", width="stretch")
+                with left:
+                    show(src, caption="Source")
+                with right:
+                    show(out, caption="Filtered")
             else:
-                st.image(F.to_display(out), width="stretch")
-        st.download_button(
-            "Download PNG",
-            data=F.encode_png(out),
-            file_name=f"{name.lower()}.png",
-            mime="image/png",
-            key=f"dl_{name}",
-            on_click="ignore",
-        )
+                show(out)
 
 
-def photo_mode(space, channel, view, selected):
-    upload = st.file_uploader(
-        "Upload a photo", type=["jpg", "jpeg", "png"], key="upload", label_visibility="collapsed"
-    )
+def photo_mode(upload, space, channel, view, selected):
     if upload is None:
         st.markdown(
             '<p class="empty">Drop a JPG or PNG above. Every filter appears here at once.</p>',
@@ -141,7 +212,7 @@ def photo_mode(space, channel, view, selected):
         )
 
     if view == "Original only":
-        st.image(F.to_display(src), caption="Source", width="stretch")
+        show(src, caption="Source")
         return
     if not selected:
         st.info("Pick at least one filter in the sidebar.")
@@ -158,29 +229,67 @@ def photo_mode(space, channel, view, selected):
 # --------------------------------------------------------------------------------------
 # Camera mode
 # --------------------------------------------------------------------------------------
-def camera_mode(cfg):
+def camera_mode(cfg, n_panels):
     if not CAMERA_READY:
         st.error("Camera mode needs streamlit-webrtc. Run: pip install streamlit-webrtc")
         return
-    ctx = webrtc_streamer(
-        key="camera",
-        video_processor_factory=FilterProcessor,
-        media_stream_constraints={"video": True, "audio": False},
-        rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-        async_processing=True,
-    )
+    with st.container(key="camera_box"):
+        ctx = webrtc_streamer(
+            key="camera",
+            video_processor_factory=FilterProcessor,
+            media_stream_constraints={"video": True, "audio": False},
+            rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+            video_html_attrs={"style": {"width": "100%", "display": "block"}, "controls": False, "autoPlay": True},
+            async_processing=True,
+        )
     if ctx.video_processor:
         ctx.video_processor.update(cfg)  # slider values reach the next frame
+    if ctx.state.playing:
+        theme.fit_camera(F.aspect(n_panels))  # no empty band under the video
     st.caption(
         "Press Start and allow camera access. If the browser blocks it, click the lock icon "
-        "in the address bar, allow the camera, and reload. Frames are limited to 480 px wide."
+        "in the address bar, allow the camera, and reload. Panels are limited in size so the video stays smooth."
     )
 
 
 # --------------------------------------------------------------------------------------
-# Page
+# Page. The sidebar is built first so the header knows the mode; it still shows on the left.
 # --------------------------------------------------------------------------------------
-theme.inject(st.session_state.get("dark", False))  # read before the toggle is drawn
+with st.sidebar:
+    mode = st.segmented_control("Mode", ["Photo", "Camera"], default="Photo", key="mode",
+                                on_change=keep_one, args=("mode", "Photo"), width="stretch") or "Photo"
+    view = st.segmented_control("View", VIEWS, default=VIEWS[0], key="view",
+                                format_func=lambda v: {"Side by side": "Compare"}.get(v, v.replace(" only", "")),
+                                on_change=keep_one, args=("view", VIEWS[0]), width="stretch") or VIEWS[0]
+    space = st.selectbox("Color space", F.SPACE_OPTIONS, key="space")
+    channel = None
+    if space == F.SINGLE_CHANNEL:
+        channel = st.selectbox("Channel", list(F.CHANNELS), key="channel")
+    st.divider()
+
+    if mode == "Photo":
+        selected = st.pills("Filters to show", F.FILTER_NAMES, selection_mode="multi",
+                            default=F.FILTER_NAMES, key="selected") or []
+        shortcuts = st.columns(3)
+        for col, group in zip(shortcuts, F.GROUPS):
+            col.button(group, key=f"grp_{group}", on_click=pick_group, args=(group,), width="stretch")
+        st.button("Reset all filters", key="reset_all", on_click=reset_all, width="stretch")
+    else:
+        n_filters = st.segmented_control("Filters on screen", [1, 2, 3], default=1, key="n_filters",
+                                         on_change=keep_one, args=("n_filters", 1), width="stretch") or 1
+        panels = []
+        for i in range(n_filters):
+            with st.expander(f"Filter {'ABC'[i]}", expanded=True):
+                name = st.pills(f"Filter {'ABC'[i]}", ["None"] + F.FILTER_NAMES, selection_mode="single",
+                                default=CAM_DEFAULTS[i], key=f"cam_filter_{i}", label_visibility="collapsed",
+                                on_change=keep_one, args=(f"cam_filter_{i}", CAM_DEFAULTS[i])) or CAM_DEFAULTS[i]
+                params = render_params(F.FILTERS.get(name, []), f"cam{i}_{name}", st)
+                if name != "None":
+                    st.button("Reset filter", key=f"reset_cam{i}", on_click=reset_params,
+                              args=(f"cam{i}_{name}", name), width="stretch")
+            panels.append((name, params))
+
+theme.inject(st.session_state.get("dark", False), hide_uploader=(mode == "Camera"))
 
 top_left, top_right = st.columns([6, 1.4], vertical_alignment="center")
 with top_left:
@@ -188,26 +297,17 @@ with top_left:
 with top_right:
     st.toggle("Dark mode", key="dark")
 
-theme.hero()
+# The uploader always exists (hidden in camera mode) so a photo survives a trip to the camera.
+saved = st.session_state.get("upload")
+photo = hero_photo(saved.getvalue(), saved.name) if (saved is not None and mode == "Photo") else None
+theme.hero(compact=(mode == "Camera" or photo is not None), photo=photo)
 
-with st.sidebar:
-    mode = st.radio("Mode", ["Photo", "Camera"], horizontal=True, key="mode")
-    view = st.radio("View", VIEWS, key="view")
-    space = st.selectbox("Color space", F.SPACE_OPTIONS, key="space")
-    channel = None
-    if space == F.SINGLE_CHANNEL:
-        channel = st.selectbox("Channel", list(F.CHANNELS), key="channel")
-    st.divider()
-    if mode == "Photo":
-        selected = st.multiselect(
-            "Filters to show", F.FILTER_NAMES, default=F.FILTER_NAMES, key="selected"
-        )
-    else:
-        options = ["None"] + F.FILTER_NAMES
-        cam_filter = st.selectbox("Filter", options, index=options.index("Gaussian"), key="cam_filter")
-        cam_params = render_params(F.FILTERS.get(cam_filter, []), f"cam_{cam_filter}", st.sidebar)
+with st.container(key="uploader_box"):
+    upload = st.file_uploader("Upload a photo", type=["jpg", "jpeg", "png"], key="upload",
+                              label_visibility="collapsed")
 
 if mode == "Photo":
-    photo_mode(space, channel, view, selected)
+    photo_mode(upload, space, channel, view, selected)
 else:
-    camera_mode((space, channel, cam_filter, cam_params, view))
+    live_view = "Compare" if view == "Side by side" else view
+    camera_mode((space, channel, panels, live_view), F.panel_count(live_view, len(panels)))

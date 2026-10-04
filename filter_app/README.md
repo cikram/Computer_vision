@@ -6,16 +6,27 @@ Built for the ENSAM *Vision par Ordinateur* mini-project (TP7). Light and dark t
 ## Features
 
 - **Photo mode:** upload a JPG or PNG. All filters appear at once in a grid. Each card has its own
-  sliders and its own PNG download button. Moving a slider updates only that card.
-- **Camera mode:** pick one filter and see it applied in real time on your webcam. The sliders act on every frame.
-- **View:** side by side, filtered only, or original only (photo and camera).
+  sliders, and two round icon buttons at the top right: reset (↺) and download PNG (⤓). Moving a slider updates only that card.
+- **Camera mode:** apply one, two or three filters at once to the live webcam. Choose how many with
+  *Filters on screen*, then pick a filter and set its sliders in each *Filter A / B / C* box.
+  The picture shows the original plus one labelled panel per filter (1 filter: side by side, 2: a row of three,
+  3: a 2x2 grid). The sliders act on every frame. Panels are cropped to 4:3 and kept small so the video stays smooth.
+- **Header:** the conveyor shows your own photo going in and its filtered versions coming out.
+  It shrinks once a photo is loaded or the camera is on, and keeps animating.
+- **Sidebar:**
+  - *Mode* and *View* (Compare, Filtered, Original) are one-click buttons.
+  - *Filters to show* are pills you click on and off, with shortcuts **Smooth**, **Edges** and **All**.
+  - **Reset all filters** puts every slider back to its default.
+  - Every slider has a **?** tooltip that explains what it does.
 - **Color space:** original (BGR), RGB, grayscale, HSV, HLS, LAB, YCrCb, or a single channel (B, G, R, H, S, V, ...).
   Channels are drawn the way `cv2.imshow` draws them, so HSV or LAB can look unusual. That is expected.
 - **Filters:** Mean, Gaussian, Median, Bilateral, Sobel, Laplacian, Canny.
-  - Sobel and Laplacian have an optional Gaussian blur before them, plus auto contrast.
-  - Canny has a "Smooth before" choice (Gaussian, Median, Bilateral) for the Gaussian+Canny,
-    Median+Canny and Bilateral+Canny tests of the TP.
+  - Sobel, Laplacian and Canny share a **Smooth before** checkbox. When ticked, pick the smoothing filter
+    (Gaussian, Median or Bilateral) and its sliders. Canny starts ticked with Gaussian; this covers the
+    Gaussian+Canny, Median+Canny and Bilateral+Canny tests of the TP.
+  - Sobel and Laplacian also have auto contrast.
 - **Dark mode** toggle in the top right.
+- Your photo is kept when you switch to the camera and back.
 
 ## Setup (Windows, PowerShell, from the `Computer_Vision` folder)
 
@@ -39,12 +50,13 @@ python -m venv .venv
 The app opens at http://localhost:8501.
 
 Do not install `opencv-python-headless` next to `opencv-python`: both provide `cv2` and they conflict.
+Streamlit 1.50 or newer is required (segmented buttons and pills); `pip install streamlit` gets the latest.
 
 ## Camera tips
 
 - Click **Start** and allow camera access when the browser asks.
 - If it was blocked, click the lock icon in the address bar, allow the camera, and reload.
-- Frames are limited to 480 px wide so Bilateral stays smooth.
+- Each panel is at most 540 px wide (360 px with three panels) so Bilateral stays smooth.
 
 ## Files
 
@@ -52,7 +64,7 @@ Do not install `opencv-python-headless` next to `opencv-python`: both provide `c
 |---|---|
 | `app.py` | Interface: sidebar, photo grid, camera |
 | `filters.py` | OpenCV logic: color spaces, the 7 filters, `apply_filter`, `process_frame`. No Streamlit code |
-| `theme.py` | Light and dark CSS, animated header |
+| `theme.py` | Light and dark CSS, animated header with your photo |
 | `requirements.txt` | Python packages |
 | `.streamlit/config.toml` | Base theme and accent color |
 
