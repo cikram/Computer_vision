@@ -28,18 +28,7 @@ Built for the ENSAM *Vision par Ordinateur* mini-project (TP7). Light and dark t
 - **Dark mode** toggle in the top right.
 - Your photo is kept when you switch to the camera and back.
 
-## Setup (Windows, PowerShell, from the `Computer_Vision` folder)
-
-Reuse the existing `cv` virtual environment and add the two missing packages:
-
-```powershell
-.\cv\Scripts\python.exe -m pip install streamlit streamlit-webrtc
-cd filter_app
-..\cv\Scripts\python.exe -m streamlit run app.py
-```
-
-Calling `python.exe` directly avoids PowerShell blocking `Activate.ps1`.
-To start from a new environment instead:
+## Setup (Windows, PowerShell, from the `filter_app` folder)
 
 ```powershell
 python -m venv .venv
@@ -48,6 +37,8 @@ python -m venv .venv
 ```
 
 The app opens at http://localhost:8501.
+Calling `python.exe` directly avoids PowerShell blocking `Activate.ps1`.
+On Linux or macOS, use `.venv/bin/python` instead of `.\.venv\Scripts\python.exe`.
 
 Do not install `opencv-python-headless` next to `opencv-python`: both provide `cv2` and they conflict.
 Streamlit 1.50 or newer is required (segmented buttons and pills); `pip install streamlit` gets the latest.
