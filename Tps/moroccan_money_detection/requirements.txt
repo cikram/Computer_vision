@@ -1,0 +1,16 @@
+torch
+torchvision
+timm
+ultralytics
+opencv-python
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+seaborn
+pillow
+imagehash
+notebook
+nbformat
+nbclient
